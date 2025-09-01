@@ -1,0 +1,243 @@
+#!/bin/bash
+
+
+LINKS(){	
+	mkdir -p "$DESTINO/BENEFICIARIO/$BENEFICIARIO/TODOS/"
+	mkdir -p "$DESTINO/BENEFICIARIO/$BENEFICIARIO/$BENEFICIARIO-$MATRICULA/"
+	mkdir -p "$DESTINO/REFERENCIA/$REFERENCIA"
+	mkdir -p "$DESTINO/TITULAR/$TITULAR/CENTRO_CUSTO/$C_CUSTO/$REFERENCIA"
+	mkdir -p "$DESTINO/CENTRO_CUSTO/$C_CUSTO/$REFERENCIA"
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO"	 		"$DESTINO/BENEFICIARIO/$BENEFICIARIO/TODOS/$ARQUIVO"
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO"	 		"$DESTINO/BENEFICIARIO/$BENEFICIARIO/$BENEFICIARIO-$MATRICULA/$ARQUIVO"
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO" 			"$DESTINO/TODOS/SHA/$ARQUIVO"
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO" 			"$DESTINO/REFERENCIA/$REFERENCIA/$ARQUIVO" 	
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO"			"$DESTINO/CENTRO_CUSTO/$C_CUSTO/$REFERENCIA/$ARQUIVO" 	
+	ln -sfv "$DESTINO/TODOS/NOME/$ARQUIVO"			"$DESTINO/TITULAR/$TITULAR/CENTRO_CUSTO/$C_CUSTO/$REFERENCIA/$ARQUIVO" 	
+	#$COMANDO  "$ORIGEM/$linha" "$DESTINO/$ARQUIVO"
+	echo ""
+}
+
+BACKUP(){
+	echo "----------------------------------------------------------------------------------------------------------"
+	echo  "'$ORIGEM/$linha' '$DESTINO/$ARQUIVO'"
+	echo  "cp -vf '$ORIGEM/$linha' '$DESTINO/$ARQUIVO'" >> /tmp/executar
+}
+
+
+########################################################################################################
+
+MODULO_CONTA_PMJP(){
+
+        MAT=$(psql contas -t -A -c "SELECT loc_cartografica FROM imoveis WHERE dono='t' ORDER BY id;")
+        MAT=$(psql contas -t -A -c "SELECT matricula FROM imoveis WHERE dono='t' ORDER BY id;")
+
+                        for b in $MAT
+                                do
+                                        B=$(echo $b | sed 's|-| - |g')
+                                        B2=$(grep -o "$B" /tmp/teste.txt | head -n 1)
+                                        IMP=$(grep -o -E "IPTU|TCR" /tmp/teste.txt | head -n 1)
+
+                                                case "$IMP" in
+                                                        "IPTU") IMPOSTO="IPTU"  ;;
+                                                        "TCR")  IMPOSTO="TCR"   ;;
+                                                esac
+
+                                                if [ -n "$B2" ]
+                                                        then
+                                                                MATRICULA=$(echo $B2 | sed 's| - |-|g')
+
+                                                                PROPRIETARIO=$(psql contas -t -A -c "SELECT proprietario FROM imoveis WHERE matricula='$MATRICULA';")
+                                                                CODIGO=$(grep -E -o '[0-9]{5}.[0-9]{5} [0-9]{5}.[0-9]{6} [0-9]{5}.[0-9]{6} [0-9] [0-9]{14}'   /tmp/teste.txt  | tail -n 1 | sed 's|\.| |g')
+                                                                VALOR=$(echo $CODIGO  | cut -c 45-52).$(echo $CODIGO | cut -c 53-54)
+                                                                DIAS=$(echo $CODIGO  | cut -c 41-44)
+                                                                VENCIMENTO=$(date -d "1997-10-07 + $DIAS days" "+%Y/%m/%d")
+                                                                echo "$PROPRIETARIO - $MATRICULA - $IMPOSTO: $CODIGO"
+                                                                echo $VALOR
+                                                                echo $VENCIMENTO
+                                                                echo ----------------------------------------
+                                                                echo ""
+                                                fi
+                                done
+
+
+}
+
+MODULO_CONTA_COND_GUARABIRA(){
+
+        MATRICULA="090218-7"
+	TIPO=$(grep -o -E "Condominio|Condomínio|Extra" /tmp/teste.txt | head -n 1)
+		case "$TIPO" in
+                        "Extra")  	TIPO="TAXA EXTRA"  ;;
+                	"Condomínio") 	TIPO="CONDOMINIO"  ;;
+                	"Condominio") 	TIPO="CONDOMINIO"  ;;
+                esac
+
+        VENCIMENTO=$(grep       -E '^[[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{4}'      /tmp/teste.txt | head -n 1)
+
+	MES=$(grep -o -E 'JANEIRO|FEVEREIRO|MARÇO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO' 	/tmp/teste.txt | head -n 1)
+	ANO=$(grep -o -E '/2010|/2011|/2012|/2013|/2014|/2015|/2016|/2017|/2018|/2019|/2020|/2021|/2022|/2023|/2024' 	/tmp/teste.txt | head -n 1 | sed 's|/||g')
+
+
+        PROPRIETARIO=$(psql contas -t -A -c "SELECT proprietario FROM imoveis WHERE matricula='$MATRICULA';")
+
+		echo "$PROPRIETARIO - AP501 - $TIPO -  $REFERENCIA: $CODIGO"
+                echo $VALOR
+                echo $VENCIMENTO
+                echo ----------------------------------------
+                echo ""
+
+}
+
+
+MODULO_CONTA_CAGEPA(){
+        MATRICULA=$(grep        -E '^[[:digit:]]{7,8}.[[:digit:]]{1}|^[[:digit:]]{7,8}-[[:digit:]]{1}'                           /tmp/teste.txt | sed 's|-||g' | sed 's|\.||g'| head -n 1)
+
+	MA="$MATRICULA"
+
+	NUM=$(echo $MATRICULA | wc -c)
+	if [ "$NUM" -eq "9" ] 
+		then
+			MATRICULA="0$MA"
+		else
+			MATRICULA="$MA"
+	fi
+
+
+	CONVENIO
+
+}
+
+MODULO_CONTA_ENERGISA(){
+	BENEFICIARIO="ENERGISA" ; TIPO="CONVENIO"
+	#UC=$(egrep '^5/'               /tmp/teste.txt)
+        MATRICULA=$(grep -E -o '[0-9]/[0-9]{1,10}-[0-9]'        /tmp/teste.txt | sed 's|-||g'| sed 's|/||g')
+}
+
+
+
+########################################################################################################
+COMPROVANTES(){
+	COMANDO2="echo psql contas -c"
+	cd "$ORIGEM"
+	ls comp*pdf Comp*pdf > /tmp/.lista
+	cd -
+	mkdir -p "$DESTINO"
+	BENEFICIARIO="COMPROVANTE"
+        while read linha
+                do
+                        echo "$ORIGEM/$linha" 
+                        SHA=$(sha512sum "$ORIGEM/$linha"  | cut -d " " -f 1)
+                        ebook-convert "$ORIGEM/$linha" /tmp/teste.txt 1>/dev/null 2>/dev/null
+	
+			COD=$(grep 			-E '[0-9]{47}|[0-9]{5}.[0-9]{5} [0-9]{5}.[0-9]{6} [0-9]{5}.[0-9]{6} [0-9]{1} [0-9]{14}|[0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1}' /tmp/teste.txt | sed 's|\.| |g')
+			
+			if [ "$COD" -z ]
+				then
+					TIPO="BOLETO"
+					COD=$(grep -o 			-E '[0-9]{47}|[0-9]{5}.[0-9]{5} [0-9]{5}.[0-9]{6} [0-9]{5}.[0-9]{6} [0-9]{1} [0-9]{14}|[0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1} [0-9]{11} [0-9]{1}' /tmp/teste.txt | sed 's|\.| |g')
+
+				else
+					TIPO="CONVENIO"
+					COD=$(grep -o 			-E '[0-9]{11}-[0-9]{1}||[0-9]{11} [0-9]{1}' /tmp/teste.txt | sed 's|-| |g' |sed 's|\.| |g')
+			fi
+
+
+			BANCO=$(grep -o -E "BANCO DO BRASIL|UNICRED|SICREDI|CAIXA" /tmp/teste.txt | head -n 1)
+
+
+		        case "$BANCO" in
+                		"BANCO DO BRASIL") 	BANCO="BB" 	;;
+                		"UNICRED") 		BANCO="SICREDI" ;;
+                		"SICREDI") 		BANCO="SICREDI" ;;
+                		"CAIXA") 		BANCO="CAIXA" 	;;
+			esac
+
+
+
+
+
+#			CODIGO=$( echo $COD | sed -e 's|\ |\%|g' -e 's|\.|\%|g')
+#			CODIGO=$( echo $COD | sed -e 's|\ |\%|g' -e 's|\.|\ |g')
+			
+			CODIGO="" ; for a in "$COD" ; do CODIGO=$(echo $CODIGO $a) ; done
+
+			DESCRICAO=$(grep -A 2 		-E 'Descrição' /tmp/teste.txt 	| tail -n 1 | sed 's|\/||g')
+			VALOR=$(grep 			-E 'Valor Pago ' /tmp/teste.txt | sed -e 's|Valor Pago ||g' -e 's|\,|\.|g')
+		        REFERENCIA=$(grep -E 'Pagamento' /tmp/teste.txt | sed -e 's|Data do Pagamento ||g' -e 's|\,|\.|g')
+               			ANO=$(echo "$REFERENCIA" | cut -d "/" -f 3)
+		                MES=$(echo "$REFERENCIA" | cut -d "/" -f 2)
+		                DIA=$(echo "$REFERENCIA" | cut -d "/" -f 1)
+		        DATA="$ANO-$MES-$DIA"
+		        REFERENCIA="$ANO""$MES"
+	
+			MATRICULA="$DESCRICAO"
+			ARQUIVO="$BENEFICIARIO - $MATRICULA".pdf
+
+		        echo "----------------------------------------------------------------------------------------------------------"
+
+			ARQUIVO="$BENEFICIARIO-$SHA".txt	;	        mkdir -p "$DESTINO/TODOS/SHA/"		;	echo cp -vf "/tmp/teste.txt" "$DESTINO/TODOS/SHA/.$ARQUIVO"
+			ARQUIVO="$BENEFICIARIO-$SHA".pdf	;	        mkdir -p "$DESTINO/TODOS/SHA/"		;	echo cp -vf "$ORIGEM/$linha" "$DESTINO/TODOS/SHA/$ARQUIVO"
+
+			echo 		"INSERT INTO comprovantes (sha,arquivo) VALUES ('$SHA','$ARQUIVO');"
+			$COMANDO2	"INSERT INTO comprovantes (sha,arquivo) VALUES ('$SHA','$ARQUIVO');"
+			echo " "
+
+			echo 		"UPDATE comprovantes SET referencia='$REFERENCIA'		WHERE arquivo='$ARQUIVO';"
+			$COMANDO	"UPDATE comprovantes SET referencia='$REFERENCIA'		WHERE arquivo='$ARQUIVO';"
+			echo " "
+			
+			echo 		"UPDATE comprovantes SET tipo='$TIPO'				WHERE arquivo='$ARQUIVO';"
+			$COMANDO2 	"UPDATE comprovantes SET tipo='$TIPO'				WHERE arquivo='$ARQUIVO';"
+			echo " "
+			
+			echo 		"UPDATE comprovantes SET banco='$BANCO'				WHERE arquivo='$ARQUIVO';"
+			$COMANDO2 	"UPDATE comprovantes SET banco='$BANCO'				WHERE arquivo='$ARQUIVO';"
+			echo " "
+			
+			echo 		"UPDATE comprovantes SET codigo='$CODIGO'			WHERE arquivo='$ARQUIVO';"
+			$COMANDO2 	"UPDATE comprovantes SET codigo='$CODIGO'			WHERE arquivo='$ARQUIVO';"
+			echo " "
+			
+			echo 		"UPDATE comprovantes SET diretorio='$DESTINO/TODOS/SHA'		WHERE arquivo='$ARQUIVO';"
+			$COMANDO2 	"UPDATE comprovantes SET diretorio='$DESTINO/TODOS/SHA'		WHERE arquivo='$ARQUIVO';"
+			echo " "
+
+
+		done < /tmp/.lista
+}
+
+
+
+CONTAS(){
+	cd "$ORIGEM"
+	ls *pdf *PDF > /tmp/.lista
+	cd -
+	while read linha
+		do
+			
+			echo $linha
+			ebook-convert "$ORIGEM/$linha" /tmp/teste.txt 1>/dev/null 2>/dev/null
+			SHA=$(sha512sum "$ORIGEM/$linha"  | cut -d " " -f 1)
+#			BENEFICIARIO=$(grep -o -i -E "CAIXA|GPS|CREA-PB|OI|ENERGISA|CAGEPA|UNIMED|BMA|" /tmp/teste.txt | head -n 1)
+			
+
+			ID=$(psql contas -t -A -c "SELECT id FROM fornecedor;")
+			for a in $ID 
+				do 
+					FORNECEDOR=$(psql contas -t -A -c "SELECT fornecedor FROM fornecedor WHERE id='$a'";) 
+					BENEFICIARIO=$(grep -o "$FORNECEDOR" /tmp/teste.txt | head -n 1) 
+						if [ -n "$BENEFICIARIO" ] 
+							then 
+								MODULO=$(psql contas -t -A -c "SELECT modulo FROM fornecedor WHERE id='$a'";) 
+						fi 
+					#$MODULO
+				done 
+					$MODULO
+		
+		done < /tmp/.lista
+
+}
+
+ORIGEM="/home/jaugusto/Downloads/CONTAS"        ;       DESTINO="/home/jaugusto/Documentos/FATURAS" ; CONTAS
+#ORIGEM="/home/jaugusto/Documentos/CONTAS/CCL/CONTAS/CONTADOR"        ;       DESTINO="/home/jaugusto/Documentos/CONTAS" ; CONTAS
+#ORIGEM="/home/jaugusto/Downloads/COMPROVANTES"        ;       DESTINO="/home/jaugusto/Documentos/COMPROVANTES" ; COMPROVANTES
